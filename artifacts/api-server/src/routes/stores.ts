@@ -131,6 +131,79 @@ router.put("/stores/:id", async (req, res): Promise<void> => {
   res.json(formatStore(row));
 });
 
+// POST /stores/:id/set-default-currency
+router.post("/stores/:id/set-default-currency", async (req, res): Promise<void> => {
+  const userId = uid(req);
+  const { id } = req.params;
+  const { currencyCode = "USD" } = req.body as { currencyCode?: string };
+
+  const [store] = await db.select().from(storeSettingsTable)
+    .where(and(eq(storeSettingsTable.id, id), eq(storeSettingsTable.userId, userId)));
+  if (!store) {
+    res.status(404).json({ error: "Store not found" });
+    return;
+  }
+
+  const { storeHash, accessToken } = store;
+  const bcHeaders = { "X-Auth-Token": accessToken, "Content-Type": "application/json", Accept: "application/json" };
+  const v2 = `https://api.bigcommerce.com/stores/${storeHash}/v2`;
+
+  // List existing currencies
+  const listRes = await fetch(`${v2}/currencies`, { headers: bcHeaders });
+  if (!listRes.ok) {
+    const text = await listRes.text();
+    res.status(502).json({ error: `BigCommerce error listing currencies: ${listRes.status} ${text}` });
+    return;
+  }
+  const currencies = (await listRes.json()) as Array<{ id: number; code: string; is_default: boolean }>;
+  const existing = currencies.find((c) => c.code.toUpperCase() === currencyCode.toUpperCase());
+
+  if (existing) {
+    if (existing.is_default) {
+      res.json({ message: `${currencyCode} is already the default currency.` });
+      return;
+    }
+    // Set existing currency as default
+    const putRes = await fetch(`${v2}/currencies/${existing.id}`, {
+      method: "PUT",
+      headers: bcHeaders,
+      body: JSON.stringify({ is_default: true }),
+    });
+    if (!putRes.ok) {
+      const text = await putRes.text();
+      res.status(502).json({ error: `BigCommerce error updating currency: ${putRes.status} ${text}` });
+      return;
+    }
+    res.json({ message: `${currencyCode} is now the default currency.` });
+    return;
+  }
+
+  // Currency doesn't exist — create it as default
+  const createRes = await fetch(`${v2}/currencies`, {
+    method: "POST",
+    headers: bcHeaders,
+    body: JSON.stringify({
+      country_iso2: "US",
+      currency_code: currencyCode,
+      currency_exchange_rate: "1.0000000",
+      name: "US Dollar",
+      token: "$",
+      token_location: "left",
+      decimal_token: ".",
+      thousands_token: ",",
+      decimal_places: 2,
+      is_default: true,
+      is_enabled: true,
+    }),
+  });
+  if (!createRes.ok) {
+    const text = await createRes.text();
+    res.status(502).json({ error: `BigCommerce error creating currency: ${createRes.status} ${text}` });
+    return;
+  }
+  res.status(201).json({ message: `${currencyCode} created and set as the default currency.` });
+});
+
 // DELETE /stores/:id
 router.delete("/stores/:id", async (req, res): Promise<void> => {
   const userId = uid(req);

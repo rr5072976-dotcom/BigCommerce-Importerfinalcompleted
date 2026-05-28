@@ -19,6 +19,7 @@ import {
   Link as LinkIcon,
   Pencil,
   X,
+  DollarSign,
 } from "lucide-react";
 
 interface StoreRecord {
@@ -90,6 +91,21 @@ function useDeleteStore() {
       if (!res.ok) throw new Error("Failed to delete store");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["stores"] }),
+  });
+}
+
+function useSetDefaultCurrency() {
+  return useMutation({
+    mutationFn: async ({ id, currencyCode = "USD" }: { id: string; currencyCode?: string }) => {
+      const res = await fetch(`${BASE}/stores/${id}/set-default-currency`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currencyCode }),
+      });
+      const data = await res.json().catch(() => ({ error: "Request failed" }));
+      if (!res.ok) throw new Error(data.error ?? "Failed to set default currency");
+      return data as { message: string };
+    },
   });
 }
 
@@ -209,7 +225,14 @@ function StoreForm({
   );
 }
 
-function StoreCard({ store, onEdit, onDelete, isDeleting }: { store: StoreRecord; onEdit: () => void; onDelete: () => void; isDeleting: boolean }) {
+function StoreCard({ store, onEdit, onDelete, isDeleting, onSetCurrency, isSettingCurrency }: {
+  store: StoreRecord;
+  onEdit: () => void;
+  onDelete: () => void;
+  isDeleting: boolean;
+  onSetCurrency: () => void;
+  isSettingCurrency: boolean;
+}) {
   return (
     <div className="rounded-lg border border-border bg-card">
       <div className="flex items-start justify-between p-4">
@@ -269,6 +292,21 @@ function StoreCard({ store, onEdit, onDelete, isDeleting }: { store: StoreRecord
           <p className="text-xs text-muted-foreground">Last updated {new Date(store.updatedAt).toLocaleString()}</p>
         </div>
       </div>
+      <Separator />
+      <div className="px-4 py-3">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs gap-1.5"
+          onClick={onSetCurrency}
+          disabled={isSettingCurrency}
+        >
+          {isSettingCurrency
+            ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Setting currency…</>
+            : <><DollarSign className="w-3.5 h-3.5" /> Set Default Currency to USD</>
+          }
+        </Button>
+      </div>
     </div>
   );
 }
@@ -279,10 +317,12 @@ export default function Settings() {
   const addStore = useAddStore();
   const updateStore = useUpdateStore();
   const deleteStore = useDeleteStore();
+  const setDefaultCurrency = useSetDefaultCurrency();
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [settingCurrencyId, setSettingCurrencyId] = useState<string | null>(null);
 
   const stores = data?.stores ?? [];
   const maxStores = data?.maxStores ?? 5;
@@ -330,6 +370,18 @@ export default function Settings() {
       toast({ title: "Failed to remove store", variant: "destructive" });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleSetCurrency = async (id: string) => {
+    setSettingCurrencyId(id);
+    try {
+      const result = await setDefaultCurrency.mutateAsync({ id });
+      toast({ title: "Currency updated", description: result.message });
+    } catch (e) {
+      toast({ title: "Failed to set currency", description: e instanceof Error ? e.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setSettingCurrencyId(null);
     }
   };
 
@@ -431,6 +483,8 @@ export default function Settings() {
                         onEdit={() => setEditingId(store.id)}
                         onDelete={() => handleDelete(store.id)}
                         isDeleting={deletingId === store.id}
+                        onSetCurrency={() => handleSetCurrency(store.id)}
+                        isSettingCurrency={settingCurrencyId === store.id}
                       />
                     )
                   ))}
