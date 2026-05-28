@@ -186,7 +186,6 @@ export async function createOrder(
     zip: row.zip || "",
     email: row.email || "",
   };
-  const currencyCode = row.currency_code?.trim().toUpperCase();
   const payload: Record<string, unknown> = {
     customer_id: customerId,
     billing_address: addr,
@@ -200,7 +199,6 @@ export async function createOrder(
         ...(variantId ? { variant_id: variantId } : {}),
       },
     ],
-    ...(currencyCode ? { currency_code: currencyCode } : {}),
   };
   const res = await fetch(`${baseUrl(creds.storeHash)}/orders`, {
     method: "POST",
