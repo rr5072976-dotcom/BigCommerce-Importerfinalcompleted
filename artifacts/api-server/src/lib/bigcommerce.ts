@@ -73,7 +73,7 @@ export async function createCustomer(
 export async function createProduct(
   creds: BigCommerceCredentials,
   row: Record<string, string>
-): Promise<{ success: boolean; entityId?: string; error?: string }> {
+): Promise<{ success: boolean; entityId?: string; error?: string; warning?: string }> {
   const payload = {
     name: row.name || "",
     type: row.type || "physical",
@@ -101,13 +101,17 @@ export async function createProduct(
   const imageUrl = row.image_url?.trim();
   if (productId && imageUrl) {
     try {
-      await fetch(`${v3Url(creds.storeHash)}/catalog/products/${productId}/images`, {
+      const imgRes = await fetch(`${v3Url(creds.storeHash)}/catalog/products/${productId}/images`, {
         method: "POST",
         headers: headers(creds.accessToken),
         body: JSON.stringify({ image_url: imageUrl, is_thumbnail: true, sort_order: 0 }),
       });
-    } catch {
-      // Image upload failure is non-fatal — product was still created
+      if (!imgRes.ok) {
+        const imgErr = await imgRes.text().catch(() => "");
+        return { success: true, entityId, warning: `Product created but image could not be attached (HTTP ${imgRes.status}): ${imgErr}` };
+      }
+    } catch (e) {
+      return { success: true, entityId, warning: `Product created but image upload failed: ${e instanceof Error ? e.message : String(e)}` };
     }
   }
 

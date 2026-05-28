@@ -124,7 +124,7 @@ export async function runImportJob(jobId: string): Promise<void> {
       rowNumber: rowNum,
       status: result.success ? "success" : "error",
       message: result.success
-        ? `Row ${rowNum} imported successfully${result.entityId ? ` (ID: ${result.entityId})` : ""}`
+        ? `Row ${rowNum} imported successfully${result.entityId ? ` (ID: ${result.entityId})` : ""}${(result as { warning?: string }).warning ? ` ⚠️ ${(result as { warning?: string }).warning}` : ""}`
         : result.error ?? "Unknown error",
       payload: result.success ? null : JSON.stringify(row),
       entityId: result.entityId ?? null,
