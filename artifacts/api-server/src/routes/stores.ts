@@ -155,8 +155,15 @@ router.post("/stores/:id/set-default-currency", async (req, res): Promise<void> 
     res.status(502).json({ error: `BigCommerce error listing currencies: ${listRes.status} ${text}` });
     return;
   }
-  const currencies = (await listRes.json()) as Array<{ id: number; code: string; is_default: boolean }>;
-  const existing = currencies.find((c) => c.code.toUpperCase() === currencyCode.toUpperCase());
+  let currencies: Array<{ id: number; currency_code: string; is_default: boolean }> = [];
+  try {
+    const body = await listRes.text();
+    if (body.trim()) currencies = JSON.parse(body);
+  } catch {
+    res.status(502).json({ error: "Could not parse BigCommerce currencies response." });
+    return;
+  }
+  const existing = currencies.find((c) => c.currency_code?.toUpperCase() === currencyCode.toUpperCase());
 
   if (existing) {
     if (existing.is_default) {
