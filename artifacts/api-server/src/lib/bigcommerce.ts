@@ -175,32 +175,22 @@ export async function createOrder(
   price: number
 ): Promise<{ success: boolean; entityId?: string; error?: string }> {
   const qty = parseInt(row.quantity, 10) || 1;
-  const payload = {
+  const addr = {
+    first_name: row.first_name || "",
+    last_name: row.last_name || "",
+    street_1: row.street_1 || row.street || "",
+    city: row.city || "",
+    country: row.country || "",
+    country_iso2: row.country_iso2 || "",
+    state: row.state || "",
+    zip: row.zip || "",
+    email: row.email || "",
+  };
+  const currencyCode = row.currency_code?.trim().toUpperCase();
+  const payload: Record<string, unknown> = {
     customer_id: customerId,
-    billing_address: {
-      first_name: row.first_name || "",
-      last_name: row.last_name || "",
-      street_1: row.street_1 || row.street || "",
-      city: row.city || "",
-      country: row.country || "",
-      country_iso2: row.country_iso2 || "",
-      state: row.state || "",
-      zip: row.zip || "",
-      email: row.email || "",
-    },
-    shipping_addresses: [
-      {
-        first_name: row.first_name || "",
-        last_name: row.last_name || "",
-        street_1: row.street_1 || row.street || "",
-        city: row.city || "",
-        country: row.country || "",
-        country_iso2: row.country_iso2 || "",
-        state: row.state || "",
-        zip: row.zip || "",
-        email: row.email || "",
-      },
-    ],
+    billing_address: addr,
+    shipping_addresses: [addr],
     products: [
       {
         product_id: productId,
@@ -210,6 +200,7 @@ export async function createOrder(
         ...(variantId ? { variant_id: variantId } : {}),
       },
     ],
+    ...(currencyCode ? { currency_code: currencyCode } : {}),
   };
   const res = await fetch(`${baseUrl(creds.storeHash)}/orders`, {
     method: "POST",
