@@ -177,7 +177,6 @@ export async function createOrder(
   const qty = parseInt(row.quantity, 10) || 1;
   const payload = {
     customer_id: customerId,
-    default_currency_code: "USD",
     billing_address: {
       first_name: row.first_name || "",
       last_name: row.last_name || "",
@@ -413,7 +412,6 @@ export async function createManualOrder(
 
   const payload: Record<string, unknown> = {
     customer_id: customerId,
-    default_currency_code: "USD",
     billing_address: addr,
     shipping_addresses: [addr],
     products: [
