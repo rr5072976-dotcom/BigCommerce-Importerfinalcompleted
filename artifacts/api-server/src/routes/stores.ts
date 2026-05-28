@@ -180,7 +180,7 @@ router.post("/stores/:id/set-default-currency", async (req, res): Promise<void> 
       await fetch(`${v2}/currencies/${existing.id}`, {
         method: "PUT",
         headers: bcHeaders,
-        body: JSON.stringify({ is_enabled: true }),
+        body: JSON.stringify({ currency_exchange_rate: existing.currency_code === code ? "1.0000000" : undefined }),
       });
     }
     res.json({ message: `${code} is enabled as a transactional currency on this store.` });
@@ -201,7 +201,6 @@ router.post("/stores/:id/set-default-currency", async (req, res): Promise<void> 
       decimal_token: ".",
       thousands_token: ",",
       decimal_places: 2,
-      is_enabled: true,
     }),
   });
 
