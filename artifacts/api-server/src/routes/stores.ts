@@ -149,45 +149,49 @@ router.post("/stores/:id/set-default-currency", async (req, res): Promise<void> 
   const bcHeaders = { "X-Auth-Token": accessToken, "Content-Type": "application/json", Accept: "application/json" };
   const v2 = `https://api.bigcommerce.com/stores/${storeHash}/v2`;
 
-  // Step 1: Check store profile for current default currency
-  const storeRes = await fetch(`${v2}/store`, { headers: bcHeaders });
-  if (storeRes.ok) {
-    try {
-      const storeInfo = await storeRes.json() as { default_currency_code?: string };
-      if (storeInfo.default_currency_code?.toUpperCase() === code) {
-        res.json({ message: `${code} is already the store's default currency.` });
-        return;
-      }
-    } catch { /* continue */ }
+  // Step 1: List all currencies to find current state
+  const listRes = await fetch(`${v2}/currencies`, { headers: bcHeaders });
+  if (!listRes.ok) {
+    const text = await listRes.text();
+    res.status(502).json({ error: `BigCommerce error listing currencies (${listRes.status}): ${text}` });
+    return;
   }
 
-  // Step 2: List existing transactional currencies
-  const listRes = await fetch(`${v2}/currencies`, { headers: bcHeaders });
-  let currencies: Array<{ id: number; currency_code: string; is_default: boolean; is_enabled: boolean }> = [];
-  if (listRes.ok) {
-    try {
-      const body = await listRes.text();
-      if (body.trim()) currencies = JSON.parse(body);
-      if (!Array.isArray(currencies)) currencies = [];
-    } catch { currencies = []; }
+  let currencies: Array<{ id: number; currency_code: string; is_default: boolean; enabled: boolean }> = [];
+  try {
+    const body = await listRes.text();
+    if (body.trim()) currencies = JSON.parse(body);
+    if (!Array.isArray(currencies)) currencies = [];
+  } catch {
+    res.status(502).json({ error: "Could not parse BigCommerce currencies response." });
+    return;
   }
 
   const existing = currencies.find((c) => c.currency_code?.toUpperCase() === code);
 
-  if (existing) {
-    // Enable it if disabled
-    if (!existing.is_enabled) {
-      await fetch(`${v2}/currencies/${existing.id}`, {
-        method: "PUT",
-        headers: bcHeaders,
-        body: JSON.stringify({ currency_exchange_rate: existing.currency_code === code ? "1.0000000" : undefined }),
-      });
-    }
-    res.json({ message: `${code} is enabled as a transactional currency on this store.` });
+  // Already the default — nothing to do
+  if (existing?.is_default) {
+    res.json({ message: `${code} is already the store's default currency.` });
     return;
   }
 
-  // Step 3: Currency not found — add it as an enabled transactional currency
+  if (existing) {
+    // Currency exists — set it as default and enable it
+    const putRes = await fetch(`${v2}/currencies/${existing.id}`, {
+      method: "PUT",
+      headers: bcHeaders,
+      body: JSON.stringify({ is_default: true, enabled: true }),
+    });
+    if (!putRes.ok) {
+      const text = await putRes.text();
+      res.status(502).json({ error: `BigCommerce error setting default (${putRes.status}): ${text}` });
+      return;
+    }
+    res.json({ message: `${code} is now the store's default currency.` });
+    return;
+  }
+
+  // Step 2: Currency doesn't exist — create it, then set as default
   const createRes = await fetch(`${v2}/currencies`, {
     method: "POST",
     headers: bcHeaders,
@@ -205,18 +209,23 @@ router.post("/stores/:id/set-default-currency", async (req, res): Promise<void> 
   });
 
   const createBody = await createRes.text();
-
   if (!createRes.ok) {
-    // If it already exists (conflict), treat as success
-    if (createRes.status === 409 || createBody.includes("already exists") || createBody.includes("already been added")) {
-      res.json({ message: `${code} is already configured on this store.` });
-      return;
-    }
-    res.status(502).json({ error: `BigCommerce error (${createRes.status}): ${createBody}` });
+    res.status(502).json({ error: `BigCommerce error creating currency (${createRes.status}): ${createBody}` });
     return;
   }
 
-  res.status(201).json({ message: `${code} has been added as an enabled currency on this store.` });
+  let newCurrencyId: number | undefined;
+  try { newCurrencyId = JSON.parse(createBody)?.id; } catch { /* ok */ }
+
+  if (newCurrencyId) {
+    await fetch(`${v2}/currencies/${newCurrencyId}`, {
+      method: "PUT",
+      headers: bcHeaders,
+      body: JSON.stringify({ is_default: true, enabled: true }),
+    });
+  }
+
+  res.status(201).json({ message: `${code} has been created and set as the store's default currency.` });
 });
 
 // DELETE /stores/:id
