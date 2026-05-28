@@ -3,20 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: BigCommerce Bulk Importer API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: credentials
+    description: BigCommerce credentials validation
+  - name: imports
+    description: Import job management
+  - name: templates
+    description: CSV template downloads
+  - name: settings
+    description: Store configuration and webhook management
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +31,368 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /credentials/validate:
+    post:
+      operationId: validateCredentials
+      tags: [credentials]
+      summary: Validate BigCommerce store credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialsInput"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialsValidation"
+
+  /imports:
+    get:
+      operationId: listImportJobs
+      tags: [imports]
+      summary: List all import jobs
+      responses:
+        "200":
+          description: List of import jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ImportJob"
+
+  /imports/customers:
+    post:
+      operationId: startCustomerImport
+      tags: [imports]
+      summary: Upload CSV and start customer import job
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImportUpload"
+      responses:
+        "201":
+          description: Import job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+
+  /imports/products:
+    post:
+      operationId: startProductImport
+      tags: [imports]
+      summary: Upload CSV and start product import job
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImportUpload"
+      responses:
+        "201":
+          description: Import job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+
+  /imports/orders:
+    post:
+      operationId: startOrderImport
+      tags: [imports]
+      summary: Upload CSV and start order import job
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ImportUpload"
+      responses:
+        "201":
+          description: Import job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+
+  /imports/{jobId}:
+    get:
+      operationId: getImportJob
+      tags: [imports]
+      summary: Get import job details
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Import job details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+        "404":
+          description: Not found
+
+  /imports/{jobId}/logs:
+    get:
+      operationId: getImportLogs
+      tags: [imports]
+      summary: Get logs for an import job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportLogsResponse"
+
+  /imports/{jobId}/pause:
+    post:
+      operationId: pauseImportJob
+      tags: [imports]
+      summary: Pause a running import job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+
+  /imports/{jobId}/resume:
+    post:
+      operationId: resumeImportJob
+      tags: [imports]
+      summary: Resume a paused import job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job resumed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+
+  /imports/{jobId}/retry-failed:
+    post:
+      operationId: retryFailedRows
+      tags: [imports]
+      summary: Retry all failed rows in an import job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Retry job created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportJob"
+
+  /imports/{jobId}/update-order-statuses:
+    post:
+      operationId: updateOrderStatuses
+      tags: [imports]
+      summary: Update BigCommerce status for all successfully imported orders in a job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: Update result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStatusUpdateResult"
+
+  /imports/{jobId}/error-report:
+    get:
+      operationId: downloadErrorReport
+      tags: [imports]
+      summary: Download CSV error report for a job
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /imports/stats/summary:
+    get:
+      operationId: getImportStats
+      tags: [imports]
+      summary: Get aggregate import statistics
+      responses:
+        "200":
+          description: Import stats summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportStats"
+
+  /templates/customers:
+    get:
+      operationId: getCustomerTemplate
+      tags: [templates]
+      summary: Download customer CSV template
+      responses:
+        "200":
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /templates/products:
+    get:
+      operationId: getProductTemplate
+      tags: [templates]
+      summary: Download product CSV template
+      responses:
+        "200":
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /templates/orders:
+    get:
+      operationId: getOrderTemplate
+      tags: [templates]
+      summary: Download order CSV template
+      responses:
+        "200":
+          description: CSV template
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /settings:
+    get:
+      operationId: getStoreSettings
+      tags: [settings]
+      summary: Get persisted store configuration
+      responses:
+        "200":
+          description: Store settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreSettings"
+    put:
+      operationId: saveStoreSettings
+      tags: [settings]
+      summary: Save and validate store credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StoreSettingsInput"
+      responses:
+        "200":
+          description: Saved settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreSettings"
+        "422":
+          description: Invalid credentials
+
+  /settings/webhooks:
+    get:
+      operationId: listWebhooks
+      tags: [settings]
+      summary: List registered BigCommerce webhooks
+      responses:
+        "200":
+          description: Webhook list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookListResponse"
+    post:
+      operationId: createWebhook
+      tags: [settings]
+      summary: Register a new BigCommerce webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookInput"
+      responses:
+        "201":
+          description: Created webhook
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Webhook"
+
+  /settings/webhooks/{webhookId}:
+    delete:
+      operationId: deleteWebhook
+      tags: [settings]
+      summary: Delete a BigCommerce webhook
+      parameters:
+        - name: webhookId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +403,213 @@ components:
       required:
         - status
 
+    CredentialsInput:
+      type: object
+      required: [storeHash, accessToken]
+      properties:
+        storeHash:
+          type: string
+        accessToken:
+          type: string
+        clientId:
+          type: ["string", "null"]
+
+    CredentialsValidation:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean
+        storeName:
+          type: ["string", "null"]
+        error:
+          type: ["string", "null"]
+
+    ImportUpload:
+      type: object
+      required: [storeHash, accessToken, delayMs]
+      properties:
+        storeHash:
+          type: string
+        accessToken:
+          type: string
+        delayMs:
+          type: integer
+        autoCompleteStatusId:
+          type: integer
+          description: "If set, automatically update all imported order statuses to this BC status ID when the job finishes"
+
+    ImportJob:
+      type: object
+      required: [id, type, status, totalRows, processedRows, successRows, failedRows, delayMs, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [customers, products, orders]
+        status:
+          type: string
+          enum: [pending, running, paused, completed, failed]
+        totalRows:
+          type: integer
+        processedRows:
+          type: integer
+        successRows:
+          type: integer
+        failedRows:
+          type: integer
+        delayMs:
+          type: integer
+        autoCompleteStatusId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+
+    ImportLogEntry:
+      type: object
+      required: [id, jobId, rowNumber, status, message, createdAt]
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        rowNumber:
+          type: integer
+        status:
+          type: string
+          enum: [success, error, processing]
+        message:
+          type: string
+        payload:
+          type: ["string", "null"]
+        entityId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ImportLogsResponse:
+      type: object
+      required: [logs, total]
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportLogEntry"
+        total:
+          type: integer
+
+    ImportStats:
+      type: object
+      required: [totalJobs, totalRows, totalSuccess, totalFailed, jobsByType]
+      properties:
+        totalJobs:
+          type: integer
+        totalRows:
+          type: integer
+        totalSuccess:
+          type: integer
+        totalFailed:
+          type: integer
+        jobsByType:
+          type: object
+          properties:
+            customers:
+              type: integer
+            products:
+              type: integer
+            orders:
+              type: integer
+          required: [customers, products, orders]
+
+    OrderStatusUpdate:
+      type: object
+      required: [statusId]
+      properties:
+        statusId:
+          type: integer
+          description: "BigCommerce order status ID (1=Pending, 2=Awaiting Payment, 3=Awaiting Fulfillment, 4=Shipped, 7=Cancelled, 10=Completed)"
+
+    OrderStatusUpdateResult:
+      type: object
+      required: [updated, failed, total]
+      properties:
+        updated:
+          type: integer
+        failed:
+          type: integer
+        total:
+          type: integer
+
+    StoreSettings:
+      type: object
+      required: [configured]
+      properties:
+        configured:
+          type: boolean
+        storeHash:
+          type: ["string", "null"]
+        clientId:
+          type: ["string", "null"]
+        accessTokenMasked:
+          type: ["string", "null"]
+          description: "Last 4 chars of the access token, rest obscured (e.g. xxxxxxxxxxxx1234)"
+        clientSecretConfigured:
+          type: ["boolean", "null"]
+          description: "Whether a client secret has been saved"
+        storeName:
+          type: ["string", "null"]
+        storeUrl:
+          type: ["string", "null"]
+        updatedAt:
+          type: ["string", "null"]
+
+    StoreSettingsInput:
+      type: object
+      required: [storeHash, accessToken]
+      properties:
+        storeHash:
+          type: string
+        accessToken:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          type: string
+
+    Webhook:
+      type: object
+      required: [id, scope, destination, is_active, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+        scope:
+          type: string
+        destination:
+          type: string
+        is_active:
+          type: boolean
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+
+    WebhookInput:
+      type: object
+      required: [scope, destination]
+      properties:
+        scope:
+          type: string
+        destination:
+          type: string
+
+    WebhookListResponse:
+      type: object
+      required: [webhooks]
+      properties:
+        webhooks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Webhook"
