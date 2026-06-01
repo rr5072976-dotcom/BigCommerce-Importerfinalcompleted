@@ -163,7 +163,10 @@ router.get("/imports/stats/summary", async (req, res): Promise<void> => {
   };
   const totalOrdersImported = jobs.filter((j) => j.type === "orders").reduce((a, j) => a + j.successRows, 0);
   const totalCustomersImported = jobs.filter((j) => j.type === "customers").reduce((a, j) => a + j.successRows, 0);
-  res.json({ totalJobs, totalRows, totalSuccess, totalFailed, jobsByType, totalOrdersImported, totalCustomersImported });
+  const totalProductsImported = jobs.filter((j) => j.type === "products").reduce((a, j) => a + j.successRows, 0);
+  const recentJob = jobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  const lastImportAt = recentJob?.createdAt ?? null;
+  res.json({ totalJobs, totalRows, totalSuccess, totalFailed, jobsByType, totalOrdersImported, totalCustomersImported, totalProductsImported, lastImportAt });
 });
 
 // GET /imports/:jobId
